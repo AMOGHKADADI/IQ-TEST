@@ -1,0 +1,7 @@
+{
+  "name": "SACA | Standardized AI Cognitive Assessment",
+  "description": "Institutional-grade cognitive assessment platform by Amogh Kadadi.",
+  "requestFramePermissions": [
+    "camera"
+  ]
+}
