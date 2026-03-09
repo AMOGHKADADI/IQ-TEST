@@ -49,7 +49,7 @@ export interface Drill {
 export interface TestResponse {
   questionId: string;
   selectedIndex: number;
-  timeTaken: number; // in milliseconds
+  timeTaken: number; 
   isCorrect: boolean;
 }
 
@@ -65,13 +65,15 @@ export interface TestResult {
 }
 
 export interface UserProfile {
+  id: string;
   name: string;
   email: string;
+  password?: string; // Simulated local auth
   ageGroup: AgeGroup;
   testMode: TestMode;
   isPremium: boolean;
   history: TestResult[];
-  completedDrillsToday?: string[]; // IDs of drills completed today
-  lastActiveDay?: string; // ISO date
+  completedDrillsToday?: string[];
+  lastActiveDay?: string;
   streak?: number;
 }

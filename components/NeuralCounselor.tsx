@@ -8,41 +8,39 @@ interface AiraProps {
   user: UserProfile;
   latestResult: TestResult | null;
   lang: Language;
+  activePage: string;
 }
 
-const Aira: React.FC<AiraProps> = ({ user, latestResult, lang }) => {
+const SUGGESTIONS = [
+  { en: "How can I improve?", hi: "मैं कैसे सुधार सकता हूँ?", kn: "ನಾನು ಹೇಗೆ ಸುಧಾರಿಸಬಹುದು?" },
+  { en: "Explain my score", hi: "मेरा स्कोर समझाएं", kn: "ನನ್ನ ಸ್ಕೋರ್ ವಿವರಿಸಿ" },
+  { en: "What is SACA?", hi: "SACA क्या है?", kn: "SACA ಎಂದರೇನು?" }
+];
+
+const Aira: React.FC<AiraProps> = ({ user, latestResult, lang, activePage }) => {
   const [isOpen, setIsOpen] = useState(false);
   const [query, setQuery] = useState('');
-  const [messages, setMessages] = useState<{ role: 'user' | 'ai'; text: string }[]>([]);
+  const [messages, setMessages] = useState<{ role: 'user' | 'ai'; text: string; timestamp: string }[]>([]);
   const [isThinking, setIsThinking] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
 
   const initialGreeting = useMemo(() => {
     return lang === 'hi' 
-      ? 'सत्यापित अभिलेखागार में आपका स्वागत है। मैं आयरा (Aira) हूँ। मैं आपकी संज्ञानात्मक प्रोफ़ाइल में क्या सहायता कर सकती हूँ?' 
+      ? `नमस्ते ${user.name}! मैं आयरा हूँ। आपकी प्रगति देखने के लिए मैं उत्साहित हूँ। आप क्या जानना चाहते हैं?` 
       : lang === 'kn' 
-      ? 'ದೃಢೀಕೃತ ಆರ್ಕೈವ್‌ಗಳಿಗೆ ಸ್ವಾಗತ. ನಾನು ಐರಾ (Aira). ಇಂದು ನಿಮ್ಮ ಅರಿವಿನ ಪ್ರೊಫೈಲ್‌ನಲ್ಲಿ ನಾನು ಹೇಗೆ ಸಹಾಯ ಮಾಡಲಿ?' 
-      : 'Welcome to the SACA Archives. I am Aira, your Institutional Analyst. How may I assist with your cognitive roadmap today?';
-  }, [lang]);
+      ? `ನಮಸ್ಕಾರ ${user.name}! ನಾನು ಐರಾ. ನಿಮ್ಮ ಪ್ರಗತಿಯನ್ನು ನೋಡಲು ನಾನು ಉತ್ಸುಕನಾಗಿದ್ದೇನೆ. ನೀವು ಏನು ತಿಳಿಯಲು ಬಯಸುತ್ತೀರಿ?` 
+      : `Hi ${user.name}! I'm Aira. I've looked at your brain scores and I'm ready to help you grow. What would you like to know?`;
+  }, [lang, user.name]);
 
   useEffect(() => {
     if (messages.length === 0) {
-      setMessages([{ role: 'ai', text: initialGreeting }]);
+      setMessages([{ 
+        role: 'ai', 
+        text: initialGreeting, 
+        timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) 
+      }]);
     }
-  }, [initialGreeting]);
-
-  const handleReset = () => {
-    setMessages([{ role: 'ai', text: initialGreeting }]);
-    setQuery('');
-  };
-
-  const userContextString = useMemo(() => {
-    let context = `Name: ${user.name || 'Anonymous'}\nAge: ${user.ageGroup}\n`;
-    if (latestResult) {
-      context += `Latest IQ: ${latestResult.iqScore}\nDomain Strengths: ${JSON.stringify(latestResult.domainScores)}\nTagline: ${latestResult.uniqueTagline}\n`;
-    }
-    return context;
-  }, [user, latestResult]);
+  }, [initialGreeting, messages.length]);
 
   useEffect(() => {
     if (scrollRef.current) {
@@ -50,116 +48,140 @@ const Aira: React.FC<AiraProps> = ({ user, latestResult, lang }) => {
     }
   }, [messages, isThinking]);
 
-  const handleSend = async () => {
-    if (!query.trim() || isThinking) return;
-
-    const userMsg = query;
+  const handleReset = () => {
+    setMessages([{ 
+      role: 'ai', 
+      text: initialGreeting, 
+      timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) 
+    }]);
     setQuery('');
-    setMessages(prev => [...prev, { role: 'user', text: userMsg }]);
+  };
+
+  const userContextString = useMemo(() => {
+    const contextObj = {
+      Name: user.name || 'Anonymous',
+      Age: user.ageGroup,
+      LatestIQ: latestResult?.iqScore || 'None yet',
+      TopDomain: latestResult ? Object.entries(latestResult.domainScores).sort(([,a],[,b]) => b-a)[0][0] : 'N/A',
+      CurrentPage: activePage
+    };
+    return JSON.stringify(contextObj);
+  }, [user, latestResult, activePage]);
+
+  const handleSend = async (customText?: string) => {
+    const textToSend = customText || query;
+    if (!textToSend.trim() || isThinking) return;
+
+    setQuery('');
+    const timestamp = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    setMessages(prev => [...prev, { role: 'user', text: textToSend, timestamp }]);
     setIsThinking(true);
 
     try {
-      const response = await getAiraResponse(userMsg, userContextString, lang);
-      setMessages(prev => [...prev, { role: 'ai', text: response || "I'm having trouble connecting to the neural core." }]);
+      const response = await getAiraResponse(textToSend, userContextString, lang);
+      setMessages(prev => [...prev, { role: 'ai', text: response || "I'm not sure, could you rephrase that?", timestamp }]);
     } catch (err) {
-      setMessages(prev => [...prev, { role: 'ai', text: "Neural link interrupted. Please verify connection." }]);
+      console.error("Aira error:", err);
+      setMessages(prev => [...prev, { role: 'ai', text: "Sorry, I had a quick glitch. Could you ask me again?", timestamp }]);
     } finally {
       setIsThinking(false);
     }
   };
 
   return (
-    <div className="fixed bottom-8 right-8 z-[100] no-print">
-      {isOpen ? (
-        <div className="bg-white/95 backdrop-blur-3xl w-[420px] h-[650px] rounded-[50px] shadow-[0_50px_100px_-20px_rgba(0,0,0,0.15)] flex flex-col overflow-hidden border border-white ring-1 ring-slate-950/5 animate-institutional">
-          {/* Enhanced Header */}
-          <div className="bg-slate-950 p-8 text-white flex justify-between items-center relative overflow-hidden">
-            <div className="absolute top-0 right-0 w-32 h-32 bg-blue-600/10 rounded-full blur-3xl -mr-16 -mt-16"></div>
-            <div className="flex items-center gap-5 relative z-10">
-              <div className="w-10 h-10 bg-blue-600 rounded-2xl flex items-center justify-center shadow-lg shadow-blue-500/30">
-                <span className="font-black text-xl">A</span>
-              </div>
-              <div className="leading-tight">
-                <h4 className="font-bold text-sm tracking-tight">Aira Analyst</h4>
-                <p className="text-[9px] text-blue-400 font-black uppercase tracking-widest mt-1">SACA Core v5.2</p>
-              </div>
-            </div>
-            <div className="flex items-center gap-2 relative z-10">
-              <button 
-                onClick={handleReset}
-                title="Reset Session"
-                className="w-10 h-10 rounded-full hover:bg-white/10 flex items-center justify-center transition-all text-slate-400 hover:text-white"
-              >
-                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path></svg>
-              </button>
-              <button onClick={() => setIsOpen(false)} className="w-10 h-10 rounded-full hover:bg-white/10 flex items-center justify-center transition-all">
-                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M6 18L18 6M6 6l12 12"></path></svg>
-              </button>
+    <>
+      <div 
+        className={`fixed inset-0 bg-slate-900/40 backdrop-blur-sm z-[140] transition-opacity duration-500 ${isOpen ? 'opacity-100' : 'opacity-0 pointer-events-none'}`}
+        onClick={() => setIsOpen(false)}
+      />
+
+      <aside className={`
+        fixed z-[150] transition-all duration-700 ease-[cubic-bezier(0.2,0,0,1)] flex flex-col bg-white shadow-2xl overflow-hidden
+        bottom-0 right-0 w-full md:w-[450px] h-[85vh] md:h-screen md:top-0
+        ${isOpen ? 'translate-x-0 translate-y-0' : 'translate-y-full md:translate-y-0 md:translate-x-full'}
+      `}>
+        <div className="bg-slate-950 px-8 py-6 text-white flex justify-between items-center shrink-0">
+          <div className="flex items-center gap-4">
+            <div className="w-12 h-12 bg-blue-600 rounded-2xl flex items-center justify-center font-black text-2xl italic shadow-lg">A</div>
+            <div>
+              <h4 className="font-bold text-lg leading-tight">Aira</h4>
+              <p className="text-[10px] text-blue-400 font-black uppercase tracking-widest">Growth Mentor</p>
             </div>
           </div>
+          <button onClick={() => setIsOpen(false)} className="w-10 h-10 rounded-xl hover:bg-white/10 flex items-center justify-center transition-all text-slate-400 hover:text-white">
+            <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M6 18L18 6M6 6l12 12"></path></svg>
+          </button>
+        </div>
 
-          {/* Chat area */}
-          <div ref={scrollRef} className="flex-grow p-8 overflow-y-auto space-y-8 scroll-smooth bg-gradient-to-b from-transparent to-slate-50/30">
-            {messages.map((msg, i) => (
-              <div key={i} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
-                <div className={`max-w-[90%] p-6 rounded-[35px] text-[13px] leading-relaxed shadow-sm transition-all ${
-                  msg.role === 'user' 
-                    ? 'bg-slate-950 text-white rounded-br-none' 
-                    : 'bg-white border border-slate-100 text-slate-700 rounded-bl-none ring-1 ring-slate-900/5'
-                }`}>
-                  <div className="prose prose-sm whitespace-pre-wrap">{msg.text}</div>
-                  {msg.role === 'ai' && i > 0 && (
-                    <div className="mt-4 pt-4 border-t border-slate-50 flex items-center gap-2">
-                       <div className="w-1 h-1 bg-blue-500 rounded-full"></div>
-                       <span className="text-[8px] font-black uppercase text-slate-300 tracking-widest">Aira Institutional Output</span>
-                    </div>
-                  )}
-                </div>
+        <div ref={scrollRef} className="flex-grow p-8 overflow-y-auto space-y-8 bg-white scroll-smooth custom-scrollbar">
+          {messages.map((msg, i) => (
+            <div key={i} className={`flex flex-col ${msg.role === 'user' ? 'items-end' : 'items-start'} animate-institutional`}>
+              <div className={`max-w-[85%] p-6 rounded-3xl text-[15px] leading-relaxed shadow-sm border ${
+                msg.role === 'user' 
+                  ? 'bg-slate-950 text-white rounded-br-none border-slate-900' 
+                  : 'bg-slate-50 text-slate-900 rounded-bl-none border-slate-100 font-serif italic text-lg'
+              }`}>
+                {msg.text}
               </div>
+              <span className="text-[8px] font-black text-slate-300 uppercase tracking-widest mt-2 px-1">
+                {msg.role === 'ai' ? 'AIRA' : 'YOU'} • {msg.timestamp}
+              </span>
+            </div>
+          ))}
+          
+          {isThinking && (
+            <div className="flex gap-2 p-4 bg-slate-50 border border-slate-100 rounded-2xl w-fit">
+              <div className="w-1.5 h-1.5 bg-blue-600 rounded-full animate-bounce"></div>
+              <div className="w-1.5 h-1.5 bg-blue-600 rounded-full animate-bounce delay-150"></div>
+              <div className="w-1.5 h-1.5 bg-blue-600 rounded-full animate-bounce delay-300"></div>
+            </div>
+          )}
+        </div>
+
+        <div className="p-8 bg-white border-t border-slate-100 shrink-0">
+          <div className="flex gap-3 overflow-x-auto pb-6 no-scrollbar">
+            {SUGGESTIONS.map((s, idx) => (
+              <button
+                key={idx}
+                onClick={() => handleSend(s[lang as keyof typeof s])}
+                className="whitespace-nowrap px-5 py-2.5 bg-white border border-slate-200 hover:border-blue-600 hover:text-blue-600 text-[10px] font-black text-slate-500 rounded-xl transition-all shadow-sm active:scale-95"
+              >
+                {s[lang as keyof typeof s]}
+              </button>
             ))}
-            {isThinking && (
-              <div className="flex justify-start">
-                <div className="bg-white border border-slate-100 p-5 rounded-[30px] rounded-bl-none flex items-center gap-2 shadow-sm">
-                  <div className="w-1.5 h-1.5 bg-blue-600 rounded-full animate-bounce"></div>
-                  <div className="w-1.5 h-1.5 bg-blue-600 rounded-full animate-bounce delay-100"></div>
-                  <div className="w-1.5 h-1.5 bg-blue-600 rounded-full animate-bounce delay-200"></div>
-                </div>
-              </div>
-            )}
           </div>
-
-          {/* Input area */}
-          <div className="p-8 bg-white border-t border-slate-100">
-            <div className="relative group">
-              <input 
-                type="text" 
-                value={query}
-                onChange={(e) => setQuery(e.target.value)}
-                onKeyDown={(e) => e.key === 'Enter' && handleSend()}
-                placeholder="Inquire about your neural roadmap..."
-                className="w-full bg-slate-50 border border-slate-100 rounded-[28px] px-8 py-5 outline-none transition-all pr-14 text-sm font-medium focus:ring-4 focus:ring-blue-600/5 focus:bg-white focus:border-blue-200"
-              />
-              <button 
-                onClick={handleSend} 
-                disabled={!query.trim() || isThinking}
-                className="absolute right-3 top-1/2 -translate-y-1/2 w-11 h-11 bg-slate-950 text-white rounded-2xl flex items-center justify-center shadow-lg hover:bg-blue-600 transition-all active:scale-90 disabled:opacity-30"
-              >
-                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M13 10V3L4 14h7v7l9-11h-7z"></path></svg>
-              </button>
-            </div>
-            <p className="text-center text-[8px] text-slate-300 font-black uppercase tracking-[0.2em] mt-4">Verified Communication Gateway</p>
+          
+          <div className="relative">
+            <input 
+              type="text" 
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              onKeyDown={(e) => e.key === 'Enter' && handleSend()}
+              placeholder="Ask me anything..."
+              className="w-full bg-slate-50 border border-slate-200 rounded-2xl px-6 py-4 outline-none transition-all pr-14 text-sm font-medium focus:bg-white focus:border-blue-500 shadow-inner"
+            />
+            <button 
+              onClick={() => handleSend()} 
+              disabled={!query.trim() || isThinking}
+              className="absolute right-2 top-1/2 -translate-y-1/2 w-10 h-10 bg-slate-950 text-white rounded-xl flex items-center justify-center shadow-lg hover:bg-blue-600 transition-all disabled:opacity-20"
+            >
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M13 10V3L4 14h7v7l9-11h-7z"></path></svg>
+            </button>
           </div>
         </div>
-      ) : (
-        <button 
-          onClick={() => setIsOpen(true)}
-          className="w-20 h-20 bg-slate-950 text-white rounded-[32px] shadow-2xl flex items-center justify-center hover:scale-110 active:scale-95 transition-all group relative border border-white/10"
-        >
-          <div className="absolute inset-0 bg-blue-600 rounded-[32px] opacity-0 group-hover:opacity-30 blur-2xl transition-all"></div>
-          <span className="relative font-black text-2xl tracking-tighter">A</span>
-        </button>
-      )}
-    </div>
+      </aside>
+
+      <button 
+        onClick={() => setIsOpen(true)}
+        className={`fixed bottom-8 right-8 z-[130] transition-all duration-700 hover-scale active-scale flex items-center gap-4 ${isOpen ? 'scale-0 opacity-0' : 'scale-100 opacity-100'}`}
+      >
+        <div className="bg-slate-950 px-6 py-4 rounded-full shadow-2xl flex items-center gap-3 border border-white/10 ring-8 ring-slate-950/5">
+           <div className="w-1.5 h-1.5 bg-green-500 rounded-full animate-pulse"></div>
+           <span className="text-[10px] font-black text-white uppercase tracking-widest">Ask Aira</span>
+           <div className="w-8 h-8 bg-blue-600 text-white rounded-lg flex items-center justify-center font-black italic">A</div>
+        </div>
+      </button>
+    </>
   );
 };
 

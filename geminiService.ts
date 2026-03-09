@@ -6,29 +6,25 @@ import { Language } from "./translations";
 const getAIClient = () => new GoogleGenAI({ apiKey: process.env.API_KEY });
 
 /**
- * High-Nuance Cognitive Synthesis.
+ * Generates a simple, non-academic summary of the user's performance.
  */
 export async function generateCognitiveAnalysis(responses: TestResponse[], user: UserProfile, lang: Language) {
   const ai = getAIClient();
   const performanceData = JSON.stringify(responses.map(r => ({
     correct: r.isCorrect,
     time: r.timeTaken,
-    questionId: r.questionId,
   })));
 
   const prompt = `
-    ROLE: Principal Institutional Psychometrician at SACA.
-    TASK: Generate an official institutional cognitive synthesis for ${user.name}.
-    PERFORMANCE_LOG: ${performanceData}.
-    DEMOGRAPHIC: ${user.ageGroup}.
-    LANGUAGE: Respond strictly in ${lang === 'hi' ? 'Hindi' : lang === 'kn' ? 'Kannada' : 'English'}.
-    
-    GUIDELINES FOR TAGLINE:
-    - HIGH (>120): 'The Cerebral Vanguard', 'Neural Grandmaster', 'Architecture of High-Complexity'.
-    - MID (90-115): 'Steady Analytical Anchor', 'Balanced Logic Architect'.
-    - DEVELOPING (<90): 'Ascending Logic Explorer', 'Foundation-Stage Analyst'.
-    
-    SUMMARY: Exactly 2 highly nuanced sentences explaining their specific cognitive behavior.
+    Subject: ${user.name}
+    Performance Data: ${performanceData}
+    Age Group: ${user.ageGroup}
+    Language: ${lang}
+
+    Task: Provide a 2-sentence encouraging summary. 
+    Rule 1: Use plain, simple English (or translated equivalent). NO academic words like "synthesis" or "architecture".
+    Rule 2: Give 1 simple, fun tip for improvement.
+    Rule 3: Provide a 2-word catchy tagline.
   `;
 
   try {
@@ -50,24 +46,37 @@ export async function generateCognitiveAnalysis(responses: TestResponse[], user:
     return JSON.parse(response.text || '{}');
   } catch (error) {
     return {
-      tagline: "Standardized Baseline Profile",
-      summary: "Evaluation successfully concluded. Cognitive markers indicate a stable performance threshold for the current demographic cohort."
+      tagline: "Quick Thinker",
+      summary: "You did a great job answering quickly! Try solving some puzzles today to keep your mind sharp."
     };
   }
 }
 
 /**
- * Aira: Fast Neural Protocol Counselor.
+ * Aira: The Personal Cognitive Mentor.
  */
 export async function getAiraResponse(query: string, userContext: string, lang: Language) {
   const ai = getAIClient();
+  
+  let userData = { Name: "User" };
+  try {
+    userData = JSON.parse(userContext);
+  } catch (e) {
+    console.error("Context parse error:", e);
+  }
+
   const systemInstruction = `
-    Identity: You are Aira, the Architect for Institutional Research & Analysis at SACA.
-    Tone: Professional, calm, empathetic, and structurally clear. 
-    Language: ${lang}.
+    Your Name: Aira.
+    Your Role: Friendly Growth Mentor at SACA.
+    User Name: ${userData.Name}.
     Context: ${userContext}.
-    Objective: Help the user understand their cognitive results, suggest neural roadmap tips, or explain SACA's research. 
-    Constraint: Keep responses under 100 words. Use bullet points for advice. Avoid jargon unless explaining it.
+    Language: ${lang}.
+
+    Tone Rules:
+    - BE SIMPLE. Use words a 10-year-old understands.
+    - BE SHORT. Keep answers under 50 words.
+    - BE HELPFUL. Always give 1 clear step the user can take.
+    - NO JARGON. Never use words like "cognitive", "psychometric", or "parameters".
   `;
 
   try {
@@ -78,25 +87,36 @@ export async function getAiraResponse(query: string, userContext: string, lang: 
     });
     return response.text;
   } catch (err) {
-    return "Institutional communication link unstable. Please retry.";
+    return "I'm having a little trouble connecting. Can you try asking me again?";
   }
 }
 
+/**
+ * Generates highly effective, simple mental drills.
+ */
 export async function generatePersonalizedDrills(domainScores: Record<string, number>, user: UserProfile, lang: Language): Promise<Drill[]> {
   const ai = getAIClient();
-  const sortedDomains = Object.entries(domainScores)
+  const focusAreas = Object.entries(domainScores)
     .sort(([, a], [, b]) => a - b)
-    .slice(0, 3)
-    .map(([domain]) => domain);
+    .slice(0, 2)
+    .map(([d]) => d)
+    .join(", ");
 
   const prompt = `
-    Generate 3 brain conditioning protocols for ${user.name} for: ${sortedDomains.join(', ')}.
+    Create 3 fun brain exercises for ${user.name} to improve in ${focusAreas}.
     Language: ${lang}.
+
+    Requirements:
+    1. SIMPLE names (e.g., 'Word Hunt', 'Number Memory').
+    2. One sentence goal.
+    3. Three easy steps (1, 2, 3).
+    4. MUST be doable in 2 minutes without special tools.
+    5. NO complicated language.
   `;
 
   try {
     const response = await ai.models.generateContent({
-      model: 'gemini-3-flash-preview',
+      model: 'gemini-3-pro-preview', // Use Pro for higher quality drill reasoning
       contents: prompt,
       config: {
         responseMimeType: "application/json",
@@ -120,56 +140,39 @@ export async function generatePersonalizedDrills(domainScores: Record<string, nu
     });
     return JSON.parse(response.text || '[]');
   } catch (error) {
-    return [];
+    return [
+      {
+        id: "d1",
+        title: "Reverse Counting",
+        domain: "Focus",
+        difficulty: "Easy",
+        duration: "1 min",
+        description: "Count backwards to boost concentration.",
+        instruction: "1. Pick a number like 50. 2. Count down to 0 in your head. 3. Try to go faster each time."
+      }
+    ];
   }
 }
 
-/**
- * Generates an institutional-grade visual of cognitive topology.
- * Requires mandatory API key selection via aistudio interface for Gemini 3 Pro series models.
- */
-export async function generateNeuralVisualization(prompt: string, imageSize: "1K" | "2K" | "4K" = "1K"): Promise<string> {
-  // Check whether an API key has been selected using pre-configured window.aistudio helper
-  const hasKey = await (window as any).aistudio.hasSelectedApiKey();
-  if (!hasKey) {
-    throw new Error("API_KEY_REQUIRED");
-  }
-
-  // Create a new GoogleGenAI instance right before making an API call to ensure it uses the most up-to-date API key
-  const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
-  
+export async function generateNeuralVisualization(prompt: string, imageSize: "1K" | "2K" | "4K" = "1K") {
+  const ai = getAIClient();
   try {
     const response = await ai.models.generateContent({
       model: 'gemini-3-pro-image-preview',
-      contents: {
-        parts: [
-          {
-            text: `SACA Institutional Neural Topology: ${prompt}. Minimalist scientific blueprint, neural architecture, professional psychometric mapping style, high-fidelity research aesthetic.`,
-          },
-        ],
-      },
+      contents: { parts: [{ text: prompt }] },
       config: {
-        imageConfig: {
-          aspectRatio: "1:1",
-          imageSize: imageSize
-        }
+        imageConfig: { aspectRatio: "1:1", imageSize: imageSize }
       },
     });
 
-    const candidates = response.candidates;
-    if (candidates && candidates.length > 0 && candidates[0].content?.parts) {
-      // The output response may contain both image and text parts; iterate to find the image part
-      for (const part of candidates[0].content.parts) {
-        if (part.inlineData) {
-          const base64EncodeString: string = part.inlineData.data;
-          return `data:${part.inlineData.mimeType};base64,${base64EncodeString}`;
-        }
+    for (const part of response.candidates[0].content.parts) {
+      if (part.inlineData) {
+        return `data:image/png;base64,${part.inlineData.data}`;
       }
     }
-    throw new Error("Institutional synthesis returned no visual payload.");
+    throw new Error("No image data.");
   } catch (error: any) {
-    // If the request fails due to key mismatch, signal that key selection is required
-    if (error.message?.includes("Requested entity was not found.")) {
+    if (error?.message?.includes("Requested entity was not found.") || error?.status === 404) {
       throw new Error("API_KEY_REQUIRED");
     }
     throw error;

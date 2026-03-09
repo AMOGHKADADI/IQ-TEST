@@ -1,5 +1,7 @@
 
-import React, { useState, useEffect } from 'react';
+import React from 'react';
+// Fixed: Imported translations and Language from the correct file (translations.ts)
+import { AgeGroup, TestMode, UserProfile } from '../types';
 import { translations, Language } from '../translations';
 
 interface HeaderProps {
@@ -7,9 +9,12 @@ interface HeaderProps {
   currentPage: string;
   lang: Language;
   setLang: (lang: Language) => void;
+  user: UserProfile | null;
+  onLogout: () => void;
 }
 
-const Header: React.FC<HeaderProps> = ({ onNavigate, currentPage, lang, setLang }) => {
+const Header: React.FC<HeaderProps> = ({ onNavigate, currentPage, lang, setLang, user, onLogout }) => {
+  // @ts-ignore
   const t = translations[lang];
 
   return (
@@ -18,11 +23,11 @@ const Header: React.FC<HeaderProps> = ({ onNavigate, currentPage, lang, setLang 
         <div className="flex justify-between h-20 items-center">
           <div className="flex items-center cursor-pointer group" onClick={() => onNavigate('home')}>
             <div className="w-10 h-10 bg-slate-950 rounded-[12px] flex items-center justify-center mr-4 shadow-sm transition-all group-hover:bg-blue-600">
-              <span className="text-white font-black text-xl">A</span>
+              <span className="text-white font-black text-xl">S</span>
             </div>
             <div className="flex flex-col">
               <span className="text-lg font-black text-slate-950 tracking-tighter uppercase leading-none">SACA</span>
-              <span className="text-[9px] font-black text-blue-600 uppercase tracking-widest leading-none mt-1">Research</span>
+              <span className="text-[9px] font-black text-blue-600 uppercase tracking-widest leading-none mt-1">Registry</span>
             </div>
           </div>
 
@@ -51,7 +56,7 @@ const Header: React.FC<HeaderProps> = ({ onNavigate, currentPage, lang, setLang 
           </nav>
 
           <div className="flex items-center space-x-6">
-            <div className="flex bg-slate-50 p-1 rounded-xl border border-slate-100">
+            <div className="flex bg-slate-50 p-1 rounded-xl border border-slate-100 mr-2">
               {(['en', 'hi', 'kn'] as Language[]).map((l) => (
                 <button
                   key={l}
@@ -65,14 +70,29 @@ const Header: React.FC<HeaderProps> = ({ onNavigate, currentPage, lang, setLang 
               ))}
             </div>
 
-            <div className="h-6 w-px bg-slate-100 hidden sm:block"></div>
-
-            <button 
-              onClick={() => onNavigate('onboarding')}
-              className="bg-slate-950 text-white px-6 py-3 rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-blue-600 transition-all shadow-lg active:scale-95"
-            >
-              {t.assessment}
-            </button>
+            {user ? (
+              <div className="flex items-center gap-5 pl-4 border-l border-slate-100">
+                 <div className="text-right hidden sm:block">
+                   <p className="text-[10px] font-black text-slate-950 uppercase leading-none mb-1">{user.name}</p>
+                   <p className="text-[8px] font-bold text-blue-600 uppercase tracking-widest leading-none">Verified Subject</p>
+                 </div>
+                 <button 
+                  onClick={() => onNavigate('dashboard')}
+                  className="w-10 h-10 bg-slate-50 rounded-xl border border-slate-100 flex items-center justify-center group overflow-hidden"
+                 >
+                    <div className="w-full h-full bg-slate-950 text-white font-black text-xs flex items-center justify-center group-hover:bg-blue-600 transition-colors">
+                      {user.name.charAt(0)}
+                    </div>
+                 </button>
+              </div>
+            ) : (
+              <button 
+                onClick={() => onNavigate('login')}
+                className="bg-slate-950 text-white px-8 py-3 rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-blue-600 transition-all shadow-lg active:scale-95"
+              >
+                Log In
+              </button>
+            )}
           </div>
         </div>
       </div>

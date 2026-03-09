@@ -26,8 +26,12 @@ const TestEngine: React.FC<TestEngineProps> = ({ onComplete, user, lang }) => {
       pool = pool.filter(q => q.difficulty >= 6);
     }
 
-    const targetCount = user.testMode === TestMode.FAST ? 5 : 10;
-    const selection = pool.sort(() => Math.random() - 0.5).slice(0, targetCount);
+    // UPDATED RIGOR: 12 for Serious, 6 for Fast
+    const targetCount = user.testMode === TestMode.SERIOUS ? 12 : 6;
+    
+    // Ensure we don't try to take more questions than exist in the filtered pool
+    const finalCount = Math.min(pool.length, targetCount);
+    const selection = pool.sort(() => Math.random() - 0.5).slice(0, finalCount);
     return selection.sort((a, b) => a.difficulty - b.difficulty);
   }, [user.ageGroup, user.testMode]);
 
